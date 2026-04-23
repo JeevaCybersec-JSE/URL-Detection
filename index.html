@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Phishing URL Detector</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --card: #20232f;
+      --border: #2e3244;
+      --text: #e8eaf0;
+      --muted: #7b7f96;
+      --green: #22c55e;
+      --green-bg: #0f2d1a;
+      --yellow: #eab308;
+      --yellow-bg: #2a2200;
+      --red: #ef4444;
+      --red-bg: #2d0e0e;
+      --blue: #60a5fa;
+      --accent: #6366f1;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .header .badge {
+      display: inline-block;
+      background: rgba(99,102,241,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(99,102,241,0.3);
+      padding: 4px 14px;
+      border-radius: 99px;
+      font-size: 12px;
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
+    .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: var(--muted); font-size: 14px; }
+
+    .container { width: 100%; max-width: 640px; }
+
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .input-row { display: flex; gap: 8px; }
+    .input-row input {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-row input:focus { border-color: var(--accent); }
+    .input-row input::placeholder { color: var(--muted); }
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:active { transform: scale(0.97); }
+
+    .examples {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .ex-label { font-size: 11px; color: var(--muted); width: 100%; }
+    .ex-btn {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .ex-btn:hover { color: var(--text); border-color: var(--accent); }
+
+    /* Result */
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: none;
+    }
+    .result-card.show { display: block; }
+
+    .result-header {
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .score-circle {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      border: 3px solid;
+      flex-shrink: 0;
+    }
+    .score-circle .num { font-size: 20px; font-weight: 700; line-height: 1; }
+    .score-circle .lbl { font-size: 9px; color: var(--muted); letter-spacing: 0.5px; }
+
+    .verdict-info { flex: 1; }
+    .verdict-url { font-size: 13px; color: var(--muted); margin-bottom: 6px; word-break: break-all; }
+    .verdict-badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 99px;
+      letter-spacing: 0.3px;
+    }
+
+    .safe   { color: var(--green); border-color: var(--green); }
+    .safe-badge { background: var(--green-bg); color: var(--green); }
+    .warn   { color: var(--yellow); border-color: var(--yellow); }
+    .warn-badge { background: var(--yellow-bg); color: var(--yellow); }
+    .danger { color: var(--red); border-color: var(--red); }
+    .danger-badge { background: var(--red-bg); color: var(--red); }
+
+    .checks { padding: 1rem 1.5rem; display: flex; flex-direction: column; gap: 8px; }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--card);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .check-icon { font-size: 16px; flex-shrink: 0; }
+    .check-body { flex: 1; }
+    .check-title { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+    .check-desc { font-size: 12px; color: var(--muted); }
+
+    .risk-bar-wrap { padding: 0 1.5rem 1rem; }
+    .risk-bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .risk-track { height: 6px; background: var(--card); border-radius: 99px; overflow: hidden; }
+    .risk-fill { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+
+    .tip-box {
+      margin: 0 1.5rem 1.25rem;
+      padding: 10px 14px;
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 10px;
+      font-size: 13px;
+      color: #a5b4fc;
+      line-height: 1.5;
+    }
+
+    .concepts {
+      margin-top: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+    }
+    .concepts h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; letter-spacing: 0.5px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(99,102,241,0.1);
+      color: #a5b4fc;
+      border: 1px solid rgba(99,102,241,0.2);
+    }
+
+    footer { margin-top: 2rem; font-size: 12px; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="badge">🛡️ CYBER DEFENSE TOOL</div>
+    <h1>Phishing URL Detector</h1>
+    <p>Analyze any URL for phishing indicators in real-time</p>
+  </div>
+
+  <div class="input-card">
+    <div class="input-row">
+      <input type="text" id="urlInput" placeholder="https://example.com/login" />
+      <button class="btn" onclick="analyze()">Analyze</button>
+    </div>
+    <div class="examples">
+      <span class="ex-label">Try an example:</span>
+      <button class="ex-btn" onclick="setUrl('https://github.com/login')">github.com ✅</button>
+      <button class="ex-btn" onclick="setUrl('http://paytm-secure-login.xyz/verify')">paytm fake ❌</button>
+      <button class="ex-btn" onclick="setUrl('http://paypal.com@evil-site.tk/confirm')">@ trick ❌</button>
+      <button class="ex-btn" onclick="setUrl('https://google.com')">google.com ✅</button>
+    </div>
+  </div>
+
+  <div class="result-card" id="resultCard">
+    <div class="result-header">
+      <div class="score-circle" id="scoreCircle">
+        <span class="num" id="scoreNum">0</span>
+        <span class="lbl">RISK</span>
+      </div>
+      <div class="verdict-info">
+        <div class="verdict-url" id="verdictUrl"></div>
+        <span class="verdict-badge" id="verdictBadge"></span>
+      </div>
+    </div>
+    <div class="checks" id="checksList"></div>
+    <div class="risk-bar-wrap">
+      <div class="risk-bar-label"><span>Risk Score</span><span id="scoreLabel">0/100</span></div>
+      <div class="risk-track"><div class="risk-fill" id="riskFill" style="width:0%"></div></div>
+    </div>
+    <div class="tip-box" id="tipBox"></div>
+  </div>
+
+  <div class="concepts">
+    <h3>SECURITY CONCEPTS COVERED</h3>
+    <div class="tags">
+      <span class="tag">Phishing Detection</span>
+      <span class="tag">URL Heuristic Analysis</span>
+      <span class="tag">Social Engineering</span>
+      <span class="tag">Threat Scoring</span>
+      <span class="tag">Domain Trust Check</span>
+      <span class="tag">SSL/TLS Awareness</span>
+    </div>
+  </div>
+
+  <footer>Phishing URL Detector · Built with Python + HTML · Open Source</footer>
+</div>
+
+<script>
+const KEYWORDS = ["login","verify","update","secure","account","bank","paypal","paytm","password","confirm","signin","credential","wallet","auth"];
+const TRUSTED = ["google.com","youtube.com","github.com","microsoft.com","apple.com","amazon.com","wikipedia.org","linkedin.com","twitter.com","facebook.com"];
+const BAD_TLDS = [".xyz",".tk",".ml",".ga",".cf",".gq",".pw",".top",".click"];
+
+function setUrl(url){ document.getElementById('urlInput').value = url; analyze(); }
+
+function analyze(){
+  const raw = document.getElementById('urlInput').value.trim();
+  if(!raw){ alert('Please enter a URL'); return; }
+  const url = raw.startsWith('http') ? raw : 'http://' + raw;
+  const lower = url.toLowerCase();
+  let hostname = '';
+  try { hostname = new URL(url).hostname.toLowerCase(); } catch(e){ hostname = lower; }
+
+  let score = 0;
+  const checks = [];
+
+  const hasHttps = url.startsWith('https://');
+  score += hasHttps ? 0 : 20;
+  checks.push({ icon: hasHttps?'✅':'❌', cls: hasHttps?'safe':'danger', title: hasHttps ? 'HTTPS Secure Connection' : 'No HTTPS Encryption', desc: hasHttps ? 'Connection is encrypted and secure' : 'HTTP only — data transmitted in plain text, easy to intercept' });
+
+  const kws = KEYWORDS.filter(k => lower.includes(k));
+  score += Math.min(kws.length*10, 30);
+  checks.push({ icon: kws.length===0?'✅':kws.length<=2?'⚠️':'❌', cls: kws.length===0?'safe':kws.length<=2?'warn':'danger', title: kws.length===0 ? 'No Suspicious Keywords' : `Suspicious Keywords (${kws.length} found)`, desc: kws.length===0 ? 'URL contains no phishing-related keywords' : `Found: ${kws.join(', ')}` });
+
+  const len = url.length;
+  score += len>100?20:len>75?10:0;
+  checks.push({ icon: len<=75?'✅':len<=100?'⚠️':'❌', cls: len<=75?'safe':len<=100?'warn':'danger', title: `URL Length: ${len} characters`, desc: len<=75?'Normal length URL':'Long URLs are commonly used to hide the real destination' });
+
+  const hasAt = url.includes('@');
+  const dashes = (hostname.match(/-/g)||[]).length;
+  score += hasAt?15:0; score += dashes>=2?10:0;
+  checks.push({ icon: (!hasAt&&dashes<2)?'✅':(hasAt||dashes>=3)?'❌':'⚠️', cls: (!hasAt&&dashes<2)?'safe':(hasAt||dashes>=3)?'danger':'warn', title: hasAt ? '"@" Symbol Detected' : dashes>=2 ? `Multiple Hyphens (${dashes})` : 'No Deceptive Tricks', desc: hasAt ? '"@" in URL hides the real domain — classic phishing trick' : dashes>=2 ? 'Multiple hyphens mimic trusted brands (e.g., paypal-secure-login)' : 'No suspicious symbols or hyphen tricks found' });
+
+  const trusted = TRUSTED.some(d => hostname===d || hostname.endsWith('.'+d));
+  const badTld = BAD_TLDS.some(t => hostname.endsWith(t));
+  score += trusted ? -15 : badTld ? 15 : 0;
+  score = Math.min(100, Math.max(0, score));
+  checks.push({ icon: trusted?'✅':badTld?'❌':'⚠️', cls: trusted?'safe':badTld?'danger':'warn', title: trusted?`Trusted Domain (${hostname})`:badTld?`Suspicious TLD Detected`:`Unknown Domain`, desc: trusted?'This is a known, verified trusted website':badTld?'Free/suspicious TLD commonly used in phishing attacks':'Domain identity could not be verified' });
+
+  const isSafe=score<=15, isWarn=score<=45;
+  const cls = isSafe?'safe':isWarn?'warn':'danger';
+  const verdict = isSafe?'LIKELY SAFE':isWarn?'SUSPICIOUS':'HIGH RISK';
+  const color = isSafe?'#22c55e':isWarn?'#eab308':'#ef4444';
+  const tip = isSafe?'No major red flags found. Always verify the domain spelling before entering credentials.':isWarn?'Warning signs detected. Do NOT enter passwords or personal information on this site.':'Multiple phishing indicators! Do NOT visit this site. This URL may steal your credentials.';
+
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('scoreCircle').className = `score-circle ${cls}`;
+  document.getElementById('verdictUrl').textContent = raw.length>60?raw.slice(0,60)+'…':raw;
+  const b = document.getElementById('verdictBadge');
+  b.textContent = verdict; b.className = `verdict-badge ${cls}-badge`;
+  document.getElementById('scoreLabel').textContent = `${score}/100`;
+  document.getElementById('riskFill').style.cssText = `width:${score}%;background:${color}`;
+  document.getElementById('tipBox').textContent = '💡 ' + tip;
+  document.getElementById('checksList').innerHTML = checks.map(c => `
+    <div class="check-item">
+      <span class="check-icon">${c.icon}</span>
+      <div class="check-body">
+        <div class="check-title ${c.cls}">${c.title}</div>
+        <div class="check-desc">${c.desc}</div>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('resultCard').classList.add('show');
+}
+
+document.getElementById('urlInput').addEventListener('keydown', e => { if(e.key==='Enter') analyze(); });
+</script>
+</body>
+</html>
